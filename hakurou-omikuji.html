@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>白狼おみくじメーカー</title>
+
+  <style>
+    :root{
+      --accent:#e64b4b;
+      --ink:#1f2a37;
+      --line:#e6eff7;
+    }
+    *{box-sizing:border-box;}
+
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+      color:var(--ink);
+      min-height:100vh;
+      display:grid;
+      place-items:center;
+      padding:24px;
+      transition: background 300ms ease, color 300ms ease;
+      background-attachment: fixed;
+      position:relative;
+      overflow-x:hidden;
+
+      /* スマホの誤爆防止 */
+      touch-action: manipulation;
+    }
+
+    /* ==========================
+       背景テーマ
+       ========================== */
+
+    /* ② 桜：周囲に桜飾り */
+    body.theme-sakura{
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 700px at 10% -10%, #fff7fb 0%, transparent 60%),
+        radial-gradient(900px 500px at 90% 110%, #ffeef6 0%, transparent 55%),
+        linear-gradient(180deg, #fff 0%, #fff5f9 100%);
+    }
+    body.theme-sakura::before,
+    body.theme-sakura::after{
+      content:"";
+      position:fixed;
+      inset:-10vh -10vw;
+      pointer-events:none;
+      z-index:0;
+      background:
+        radial-gradient(90px 90px at 12% 20%, rgba(255,170,205,.55) 0 35%, transparent 36%),
+        radial-gradient(120px 120px at 28% 35%, rgba(255,190,220,.50) 0 30%, transparent 31%),
+        radial-gradient(110px 110px at 75% 25%, rgba(255,160,210,.50) 0 32%, transparent 33%),
+        radial-gradient(140px 140px at 85% 50%, rgba(255,200,230,.45) 0 30%, transparent 31%),
+        radial-gradient(90px 90px at 55% 75%, rgba(255,175,215,.45) 0 28%, transparent 29%);
+      filter: blur(6px);
+      opacity:.9;
+    }
+    body.theme-sakura::after{
+      background:
+        radial-gradient(8px 8px at 15% 15%, rgba(255,160,200,.9) 0 60%, transparent 61%),
+        radial-gradient(10px 10px at 30% 25%, rgba(255,180,210,.9) 0 60%, transparent 61%),
+        radial-gradient(8px 8px at 70% 18%, rgba(255,170,210,.9) 0 60%, transparent 61%),
+        radial-gradient(10px 10px at 82% 40%, rgba(255,190,220,.9) 0 60%, transparent 61%),
+        radial-gradient(8px 8px at 60% 70%, rgba(255,170,210,.9) 0 60%, transparent 61%);
+      filter: blur(0px);
+      opacity:.7;
+      mix-blend-mode:multiply;
+    }
+
+    /* ③ 神社柄：あなたの画像を背景に（格子ひし形は完全削除） */
+    body.theme-shrine{
+      color: var(--ink);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.84)),
+      url("sakura-torii-bg.png.png");
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+    }
+
+    /* ④ 夜桜：ライトアップ風 */
+    body.theme-night{
+      color:#e9eef6;
+      background:
+        radial-gradient(1000px 700px at 50% 110%, rgba(255,140,200,.35), transparent 60%),
+        radial-gradient(900px 650px at 10% -10%, rgba(90,120,160,.35), transparent 60%),
+        radial-gradient(800px 500px at 90% 110%, rgba(130,70,120,.25), transparent 60%),
+        linear-gradient(180deg, #0e1522 0%, #121a2b 60%, #0b111b 100%);
+      background-attachment: fixed;
+    }
+    body.theme-night::before{
+      content:"";
+      position:fixed; inset:-10vh -10vw;
+      background:
+        radial-gradient(120px 120px at 18% 28%, rgba(255,170,210,.25) 0 30%, transparent 31%),
+        radial-gradient(140px 140px at 70% 35%, rgba(255,190,220,.22) 0 28%, transparent 29%),
+        radial-gradient(110px 110px at 55% 75%, rgba(255,160,210,.20) 0 26%, transparent 27%);
+      filter: blur(10px);
+      opacity:.9;
+      z-index:0; pointer-events:none;
+    }
+
+    /* ==========================
+       背景オブジェクト（鳥居/左右キャラ）
+       ========================== */
+
+    /* 鳥居を薄く背景に（神社柄のみ表示） */
+    .torii-bg{
+      position:fixed;
+      bottom:-6vh;
+      left:50%;
+      transform:translateX(-50%);
+      width:min(980px, 120vw);
+      opacity:0;                 /* 初期は非表示 */
+      z-index:0;
+      pointer-events:none;
+      filter: saturate(1.1);
+      transition: opacity 250ms ease;
+    }
+    body.theme-shrine .torii-bg{ opacity:.20; }
+
+    /* 左右キャラ（神社柄のときだけ表示） */
+    .side{
+      position:fixed;
+      bottom:2vh;
+      width:min(220px, 28vw);
+      z-index:1;
+      pointer-events:none;
+      opacity:0;
+      transform:translateY(10px);
+      transition:opacity 250ms ease, transform 250ms ease;
+      filter: drop-shadow(0 8px 16px rgba(0,0,0,.15));
+    }
+    .side.left{ left:2vw; }
+    .side.right{ right:2vw; }
+    body.theme-shrine .side{
+      opacity:1;
+      transform:translateY(0);
+    }
+
+    /* ==========================
+       レイアウト本体
+       ========================== */
+    .stage{
+      position:relative;
+      width:100%;
+      display:grid;
+      place-items:center;
+      z-index:2; /* 背景より前 */
+    }
+
+    .card{
+      width:min(760px, 100%);
+      background:rgba(255,255,255,0.95);
+      border:2px solid var(--line);
+      border-radius:20px;
+      padding:22px 18px 16px;
+      box-shadow:0 10px 35px rgba(31,42,55,0.08);
+      text-align:center;
+      position:relative;
+      z-index:3;
+    }
+    body.theme-night .card{
+      background:rgba(12,18,30,0.92);
+      border-color:rgba(160,190,220,0.28);
+      box-shadow:0 10px 40px rgba(0,0,0,0.35);
+    }
+
+    /* 背景切替UI */
+    .theme-bar{
+      display:flex; gap:8px; justify-content:center; flex-wrap:wrap;
+      margin-bottom:10px;
+      position:relative; z-index:4;
+    }
+    .theme-btn{
+      border:1px solid #dbe6f2;
+      background:#ffffff;
+      padding:6px 10px;
+      border-radius:999px;
+      font-size:13px;
+      font-weight:800;
+      cursor:pointer;
+      user-select:none;
+    }
+    body.theme-night .theme-btn{
+      background: rgba(255,255,255,0.06);
+      border-color: rgba(180,200,220,0.3);
+      color:#e9eef6;
+    }
+    .theme-btn.active{
+      outline:2px solid var(--accent);
+      outline-offset:1px;
+    }
+
+    .badge{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:6px 12px; border-radius:999px;
+      background:#f1f6fb; font-weight:800; font-size:14px;
+    }
+    body.theme-night .badge{
+      background: rgba(255,255,255,0.06);
+      color:#e9eef6;
+    }
+    .badge .dot{
+      width:8px;height:8px;border-radius:50%;
+      background:var(--accent);display:inline-block;
+    }
+
+    h1{margin:12px 0 4px;font-size:24px;letter-spacing:.05em;}
+    .sub{font-size:13px;opacity:.8;margin-bottom:12px;}
+
+    .slot{
+      margin:14px auto 8px;
+      padding:18px 12px;
+      border-radius:14px;
+      border:2px dashed #dce7f2;
+      background:#fbfdff;
+      font-size:42px; font-weight:900; letter-spacing:.08em;
+      min-height:92px; display:grid; place-items:center;
+      user-select:none;
+    }
+    body.theme-night .slot{
+      background: rgba(255,255,255,0.06);
+      border-color: rgba(180,200,220,0.35);
+      color:#fff;
+    }
+
+    .message{
+      margin:8px auto 6px;
+      font-size:16px; line-height:1.9;
+      min-height:92px; padding:6px 12px;
+      white-space:pre-line;
+    }
+    .rows{
+      display:flex; flex-wrap:wrap; gap:8px; justify-content:center;
+      margin:8px 0 10px; font-size:14px;
+    }
+    .pill{
+      padding:6px 10px; border-radius:10px; background:#f1f6fb; font-weight:800;
+      border:1px solid #e3edf7;
+    }
+    body.theme-night .pill{
+      background: rgba(255,255,255,0.06);
+      border-color: rgba(180,200,220,0.25);
+      color:#e9eef6;
+    }
+
+    .btn{
+      margin-top:8px; width:100%;
+      border:none; border-radius:12px; padding:14px 10px;
+      font-size:16px; font-weight:900; letter-spacing:.04em;
+      cursor:pointer;
+      background:linear-gradient(90deg, #eaf5ff, #ffffff);
+      border:2px solid #e2edf7;
+    }
+    body.theme-night .btn{
+      background: linear-gradient(90deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+      color:#fff;
+      border-color: rgba(180,200,220,0.3);
+    }
+    .btn:active{transform:translateY(1px);}
+    .hint{margin-top:8px;font-size:13px;opacity:.8;}
+    .tiny{font-size:12px;opacity:.75;margin-top:6px;}
+  </style>
+</head>
+
+<body class="theme-sakura">
+  <!-- 鳥居（神社柄で表示） -->
+  <img class="torii-bg" id="toriiBg" src="torii1_myoujin.png" alt="鳥居背景">
+
+  <!-- 左右キャラ（神社柄で表示） -->
+  <img class="side left" id="kontou" src="kontou.png" alt="紺灯">
+  <img class="side right" id="hyouga" src="hyouga.png" alt="氷牙">
+
+  <div class="stage">
+    <div class="card" id="card">
+      <div class="theme-bar">
+        <button class="theme-btn active" data-theme="sakura">🌸 桜</button>
+        <button class="theme-btn" data-theme="shrine">⛩️ 神社</button>
+        <button class="theme-btn" data-theme="night">🌙 夜桜</button>
+      </div>
+
+      <div class="badge"><span class="dot"></span>狐狼神社 御籤</div>
+      <h1>白狼おみくじメーカー</h1>
+      <div class="sub">画面をタップして止めると、今日の運勢が出るよ🐺⛩️</div>
+
+      <div class="slot" id="slot">タップで開始</div>
+      <div class="message" id="message"></div>
+      <div class="rows" id="rows"></div>
+
+      <button class="btn" id="btn">タップして回す / 止める</button>
+      <div class="hint">※ もう一度タップで引き直し</div>
+      <div class="tiny">© 狐狼神社 / 白狼るか</div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const omikuji = [
+    {name:"大神吉",msg:"狐狼神社の神さまが特別に微笑んでるよ⛩️✨\n今日は願いごと、ひとつ動かしてみよ？",
+     lucky:["挑戦◎","朝の散歩◎","人に優しく◎"], item:"白いお守り", color:"澄んだ水色", food:"温かいお茶"},
+    {name:"大吉",msg:"とっても良い流れ！\nやりたいことに素直になってOKの日だよ🐺💙",
+     lucky:["行動◎","告白◎","買い物◎"], item:"鈴のキーホルダー", color:"白", food:"おにぎり"},
+    {name:"中吉",msg:"いい兆しが来てる感じ〜。\n小さな幸せに気づくと運気がさらに上がるよ。",
+     lucky:["整理◎","連絡◎","深呼吸◎"], item:"和柄ノート", color:"薄桃", food:"和菓子"},
+    {name:"小吉",msg:"ゆっくり進めばちゃんと良くなる日。\n焦らずふわっといこ🐺",
+     lucky:["休憩◎","丁寧◎","早寝◎"], item:"しっぽ型チャーム", color:"淡い金", food:"みそ汁"},
+    {name:"白狼吉",msg:"白狼だけが見つけられる幸せが寄ってくる特別運！\nあなたの優しさが運気を連れてくるよ⛩️🐺",
+     lucky:["気づき◎","癒し◎","思いやり◎"], item:"白狼の御札", color:"銀色", food:"はちみつ"},
+    {name:"平福",msg:"今日は穏やかに整う日。\n無理しないで、呼吸多めでね。",
+     lucky:["のんびり◎","現状維持◎","体ケア◎"], item:"あったかブランケット", color:"薄い灰青", food:"スープ"},
+    {name:"微凶",msg:"ちょっと注意の日だけど大丈夫。\n慎重に歩けば問題なし！るかがついてるよ🐺",
+     lucky:["忘れ物注意","夜は早めに◎","落ち着いて◎"], item:"小さなライト", color:"深い藍", food:"バナナ"},
+    {name:"おばけ凶",msg:"こ、こわがらせるつもりじゃないんだけど…\n油断するとビクッ！があるかも🐺💦\n夜は明るくして早寝が吉！",
+     lucky:["慎重◎","夜道注意","音に注意…"], item:"清めの塩", color:"黒", food:"ホットミルク"},
+    {name:"るか保護案件",msg:"今日は無茶しないでね…！\nるかが保護するレベルの日🐺💦\n深呼吸して、やさしく過ごそ？",
+     lucky:["休む◎","頼る◎","やめる勇気◎"], item:"特大お守り", color:"赤", food:"甘いもの"}
+  ];
+
+  const slot = document.getElementById("slot");
+  const message = document.getElementById("message");
+  const rows = document.getElementById("rows");
+  const btn = document.getElementById("btn");
+  const card = document.getElementById("card");
+
+  let timer = null;
+  let running = false;
+  let currentIndex = 0;
+  const randIndex = () => Math.floor(Math.random() * omikuji.length);
+
+  function renderResult(i){
+    const r = omikuji[i];
+    slot.textContent = r.name;
+    message.textContent = r.msg;
+    rows.innerHTML = `
+      <div class="pill">ラッキー: ${r.lucky.join(" / ")}</div>
+      <div class="pill">ラッキーアイテム: ${r.item}</div>
+      <div class="pill">ラッキーカラー: ${r.color}</div>
+      <div class="pill">ラッキーフード: ${r.food}</div>
+    `;
+  }
+
+  function start(){
+    running = true;
+    message.textContent = "";
+    rows.innerHTML = "";
+    btn.textContent = "タップして止める";
+    timer = setInterval(()=>{
+      currentIndex = randIndex();
+      slot.textContent = omikuji[currentIndex].name;
+    }, 65);
+  }
+
+  function stop(){
+    running = false;
+    clearInterval(timer);
+    timer = null;
+    btn.textContent = "もう一度引く";
+    renderResult(currentIndex);
+  }
+
+  function toggle(){
+    if(!running && !timer){
+      start();
+    }else if(running){
+      stop();
+    }else{
+      slot.textContent = "タップで開始";
+      message.textContent = "";
+      rows.innerHTML = "";
+      start();
+    }
+  }
+
+  function handleTap(e){
+    if (e.target === btn) return;
+    toggle();
+  }
+
+  /* ===== スマホ/PCのタッチ強化 ===== */
+  btn.addEventListener("click", toggle);
+  card.addEventListener("click", handleTap);
+
+  btn.addEventListener("pointerdown", (e)=>{ e.preventDefault(); toggle(); });
+  card.addEventListener("pointerdown", (e)=>{ e.preventDefault(); handleTap(e); });
+
+  btn.addEventListener("touchstart", (e)=>{ e.preventDefault(); toggle(); }, {passive:false});
+  card.addEventListener("touchstart", (e)=>{ e.preventDefault(); handleTap(e); }, {passive:false});
+
+  /* ===== 背景切替 ===== */
+  const themeBtns = document.querySelectorAll(".theme-btn");
+  themeBtns.forEach(b=>{
+    b.addEventListener("click", (e)=>{
+      const t = b.dataset.theme;
+      document.body.classList.remove("theme-sakura","theme-shrine","theme-night");
+      document.body.classList.add(`theme-${t}`);
+      themeBtns.forEach(x=>x.classList.remove("active"));
+      b.classList.add("active");
+      e.stopPropagation();
+    });
+    b.addEventListener("pointerdown",(e)=>e.stopPropagation());
+    b.addEventListener("touchstart",(e)=>e.stopPropagation(),{passive:false});
+  });
+})();
+</script>
+</body>
+</html>
