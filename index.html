@@ -380,15 +380,17 @@
     toggle();
   }
 
-  /* ===== スマホ/PCのタッチ強化 ===== */
-  btn.addEventListener("click", toggle);
-  card.addEventListener("click", handleTap);
+  /* ===== タップ処理（スマホ・PC共通） ===== */
 
-  btn.addEventListener("pointerdown", (e)=>{ e.preventDefault(); toggle(); });
-  card.addEventListener("pointerdown", (e)=>{ e.preventDefault(); handleTap(e); });
+// ボタンをタップしたとき
+btn.addEventListener("click", toggle);
 
-  btn.addEventListener("touchstart", (e)=>{ e.preventDefault(); toggle(); }, {passive:false});
-  card.addEventListener("touchstart", (e)=>{ e.preventDefault(); handleTap(e); }, {passive:false});
+// カード全体のタップ（ボタン以外）
+card.addEventListener("click", (e)=>{
+  if(e.target === btn) return;
+  toggle();
+});
+
 
   /* ===== 背景切替 ===== */
   const themeBtns = document.querySelectorAll(".theme-btn");
@@ -408,4 +410,5 @@
 </script>
 </body>
 </html>
+
 
